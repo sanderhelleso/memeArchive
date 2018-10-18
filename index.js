@@ -11,45 +11,56 @@ process.on('uncaughtException', function (err) {});
 // app server
 const app = express();
 const server = http.createServer(app);
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 1337;
 const host = process.env.HOST || 'localhost';
 
-let index = 0;
-const url = `https://api.imgur.com/3/gallery/hot/viral/${index}.json`;
+// run request
+const url = `https://api.imgur.com/3/gallery/hot/viral/0.json`;
 const folder = 'archive/';
+const hours = 3600000 / 4; // 15 min
 
+// initiate download proccess
 getJsonData();
+
+// download new memes every set hour
+setInterval(() => {
+    getJsonData();
+}, hours);
+
+// fetch meme json and attempt to download
 function getJsonData() {
-    console.log(url);
+    console.log(`=================== ATTEMPTING NEW MEME COLLECTION AT ${new Date()} ===================\n\n`)
     request({
         url: url,
         json: true
     }, (error, response, body) => {
         if (!error && response.statusCode === 200) {
-            let counter = 0;
             body.data.forEach(memeData => {
-                const imageData = memeData.images;
-                const imageTitle = memeData.title.split(' ').join('_').split("'").join('').split('"').join('');
-                for (let i in imageData) {
-                    console.log(imageData[i].link);
-                    const imageLink = imageData[i].link;
-                    const imageExt = imageData[i].type.split('/')[1];
-                    download(imageLink, `${folder}/${imageTitle}${path.extname(imageLink)}`, () => {
-                        console.log('done');
-                    });
-                }
-                
-                if (counter === body.data.length - 1) {
-                    index++;
-                    getJsonData();
-                }
 
-                counter++;
+                // meme img data and title
+                const memeImg = memeData.images;
+                const memeTitle = memeData.title.split(' ').join('_').split("'").join('').split('"').join('');
+                for (let i in memeImg) {
+
+                    // meme link and extension
+                    const memeLink = memeImg[i].link;
+                    const memeExt = memeImg[i].type.split('/')[1];
+
+                    // check if file allready exists
+                    if (!fileExists(memeTitle)) {
+
+                        // download current image
+                        download(memeLink, `${folder}/${memeTitle}${path.extname(memeLink)}`, () => {
+                            console.log(`Successfully downloaded a new meme: ${memeTitle} at ${new Date()}`);
+                        });
+                    }
+                }
             })
         }
     });
 }
 
+// dowload file from url
 function download(uri, filename, callback){
     request.head(uri, (err, res, body) => {
         const file = fs.createWriteStream(filename, {flags: 'wx'});
@@ -60,6 +71,24 @@ function download(uri, filename, callback){
         .on('close', callback)
     });
 };
+
+// check if a file exists
+function fileExists(file) {
+    if (file === '.') {
+        return true;
+    }
+    try {
+        if (fs.existsSync(`${folder}${file}`)) {
+            console.log(`Skipped downloading of file: ${file} File allready in archive`);
+            return true;
+        }
+    } 
+    catch(err) {
+        throw(err);
+    }
+
+    return false;
+}
 
 
 // start server

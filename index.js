@@ -4,7 +4,6 @@ const http = require("http");
 const request = require("request");
 const fs = require('fs');
 const path = require('path');
-
 process.on('uncaughtException', function (err) {});
 
 
@@ -18,6 +17,7 @@ const host = process.env.HOST || 'localhost';
 const url = `https://api.imgur.com/3/gallery/hot/viral/0.json`;
 const folder = 'archive/';
 const hours = 3600000 / 4; // 15 min
+let collected = 0;
 
 // initiate download proccess
 getJsonData();
@@ -27,14 +27,23 @@ setInterval(() => {
     getJsonData();
 }, hours);
 
+// get amount of memes
+function amountOfMemes() {
+    fs.readdir(folder, (err, files) => {
+        console.log(`You currently have ${files.length} memes and have collected ${collected} memes since you started script`);
+    });
+}
+
 // fetch meme json and attempt to download
 function getJsonData() {
-    console.log(`=================== ATTEMPTING NEW MEME COLLECTION AT ${new Date()} ===================\n\n`)
+    amountOfMemes();
+    console.log(`ATTEMPTING NEW MEME COLLECTION AT ${new Date()}\n`);
     request({
         url: url,
         json: true
     }, (error, response, body) => {
         if (!error && response.statusCode === 200) {
+            console.log('Collecting...');
             body.data.forEach(memeData => {
 
                 // meme img data and title
@@ -52,6 +61,7 @@ function getJsonData() {
                         // download current image
                         download(memeLink, `${folder}/${memeTitle}${path.extname(memeLink)}`, () => {
                             console.log(`Successfully downloaded a new meme: ${memeTitle} at ${new Date()}`);
+                            collected++;
                         });
                     }
                 }
